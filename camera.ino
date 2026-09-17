@@ -1,10 +1,35 @@
 #include <M5Unified.h>
+#include <M5Unified.h>
 #include <WiFi.h>
-#include <HTTPClient.h>
+#include <WebServer.h>
 
 // AP info
-const char *ssid = "*";
-const char *pass = "*";
+const char *ssid = "***";
+const char *pass = "***";
+
+WebServer server(80);
+
+// index.html
+static char index_html[] = R"(
+<!DOCTYPE html>
+  <head>
+    <meta charset="UTF-8">
+    <title>Hello</title>
+  </head>
+  <body>
+    <h1>hello world</h1>
+  </body>
+</html>
+)";
+
+// Handler
+void handler_root() {
+  server.send(200, "text/html", index_html);
+}
+
+void handler_not_found() {
+  server.send(404, "text/plain", "404 Not Found");
+}
 
 void setup() {
   auto cfg = M5.config();
@@ -14,7 +39,7 @@ void setup() {
   delay(500);
 
   WiFi.begin(ssid, pass);
-  
+
   Serial.println("Connecting...");
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
@@ -23,23 +48,17 @@ void setup() {
 
   Serial.print("IP=");
   Serial.println(WiFi.localIP());
-}
 
-const char *uri = "https://example.com/";
+  // Configure and start server
+  server.on("/", handler_root);
+  server.onNotFound(handler_not_found);
+  server.begin();
+}
 
 void loop() {
   M5.update();
 
-  // Test access
-  HTTPClient http;
-  http.begin(uri);
-  int http_code = http.GET();
-  if (http_code == HTTP_CODE_OK) {
-    auto payload = http.getString();
-    Serial.println(payload);
-  } else {
-    Serial.println("HTTP GET failed");
-  }
+  server.handleClient();
 
-  delay(10000);
+  delay(1000);
 }
