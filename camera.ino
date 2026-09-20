@@ -9,49 +9,29 @@ const char *ssid = "***";
 const char *pass = "***";
 
 // Server instance
-WebServer server(80);
+WiFiServer server(80);
 
-// index.html
-static char index_html[] = R"(
-<!DOCTYPE html>
-  <head>
-    <meta charset="UTF-8">
-    <title>Hello</title>
-  </head>
-  <body>
-    <h1>hello world</h1>
-    <div>
-      <button onclick="location.href='/get/push_button'">Capture</button>
-    </div>
-  </body>
-</html>
-)";
-
-// Handler
-void handler_root() {
-  server.send(200, "text/html", index_html);
-}
-
-void handler_not_found() {
-  server.send(404, "text/plain", "404 Not Found");
-}
-
-void handler_push_button() {
+void capture(WiFiClient *client) {
   // Get a frame
   camera_fb_t *fb = esp_camera_fb_get();
   if (!fb) {
     Serial.println("[ERROR] capture failed");
-    server.send(500, "text/plain", "505 Internal Server Error");
     return;
   }
 
+  // Convert to JPEG
   uint8_t *jpg = NULL;
   size_t jpg_len = 0;
-  frame2jpg(fb, 255, &jpg, &jpg_len);
+  frame2jpg(fb, 80, &jpg, &jpg_len);
 
-  char buf[256];
-  server.sendHeader("Content-Disposition", "inline; filename=capture.jpg");
-  server.send(200, "image/jpeg", (const char *)jpg);
+  // Send the JPEG
+  client->println("HTTP/1.1 200 OK");
+  client->printf(
+    "Content-Type: image/jpeg\r\nContent-Length: %u\r\n", jpg_len
+  );
+  client->println("Content-Disposition: inline; filename=capture.jpg");
+  client->println();
+  client->write(jpg, jpg_len);
 
   free(jpg);
 
@@ -91,7 +71,7 @@ void setup() {
     .pin_href = 14,
     .pin_pclk = 40,
 
-    .xclk_freq_hz = 12000000,
+    .xclk_freq_hz = 20000000,
     .ledc_timer = LEDC_TIMER_0,
     .ledc_channel = LEDC_CHANNEL_0,
 
@@ -106,8 +86,10 @@ void setup() {
     .sccb_i2c_port = 0,
   };
 
-  // Initialize the camera
+  // Release I2C port (when using M5Unified)
   M5.In_I2C.release();
+
+  // Initialize the camera
   esp_err_t err = esp_camera_init(&cam_cfg);
   if (err != ESP_OK) {
     Serial.printf("[ERROR] camera init failed: error code=0x%x\n", err);
@@ -119,7 +101,9 @@ void setup() {
   s->set_vflip(s, 1);
 
   // Establish WiFi connection
+  WiFi.mode(WIFI_STA);
   WiFi.begin(ssid, pass);
+  WiFi.setSleep(false);
   Serial.println("Connecting");
   while (WiFi.status() != WL_CONNECTED) {
     Serial.print(".");
@@ -129,17 +113,19 @@ void setup() {
   Serial.print("IP=");
   Serial.println(WiFi.localIP());
 
-  // Start server
-  server.on("/", handler_root);
-  server.onNotFound(handler_not_found);
-  server.on("/get/push_button", handler_push_button);
+  // Start the server
   server.begin();
 }
 
 void loop() {
   M5.update();
 
-  server.handleClient();
+  WiFiClient client = server.accept();
+  if (client) {
+    if (client.connected() && client.available()) {
+      capture(&client);
+    }
 
-  delay(1000);
+    client.stop();
+  }
 }
