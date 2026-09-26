@@ -50,6 +50,8 @@ void setup() {
   digitalWrite(18, LOW);
   delay(500);
 
+  Serial.println("Init camera");
+
   // Camera configuration
   camera_config_t cam_cfg = {
     .pin_pwdn = -1,
@@ -101,12 +103,17 @@ void setup() {
 
   // Establish WiFi connection
   WiFi.mode(WIFI_STA);
+  WiFi.disconnect(false, true);
   WiFi.begin(ssid, pass);
-  WiFi.setSleep(false);
+
   Serial.println("Connecting");
-  while (WiFi.status() != WL_CONNECTED) {
+  auto status = WiFi.status();
+  while (status != WL_CONNECTED) {
     Serial.print(".");
+    WiFi.disconnect();
     delay(1000);
+    WiFi.reconnect();
+    status = WiFi.status();
   }
   Serial.printf("Connected: SSID=%s\n", ssid);
   Serial.print("IP=");
