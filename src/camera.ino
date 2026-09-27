@@ -21,7 +21,7 @@ void capture(WiFiClient *client) {
   // Convert to JPEG
   uint8_t *jpg = NULL;
   size_t jpg_len = 0;
-  frame2jpg(fb, 80, &jpg, &jpg_len);
+  frame2jpg(fb, 50, &jpg, &jpg_len);
 
   // Send the JPEG
   client->println("HTTP/1.1 200 OK");
@@ -50,6 +50,10 @@ void setup() {
   digitalWrite(18, LOW);
   delay(500);
 
+  // Set I2C pins for AtomS3R
+  M5.In_I2C.release();
+  M5.In_I2C.begin(I2C_NUM_0, 12, 9);
+
   Serial.println("Init camera");
 
   // Camera configuration
@@ -72,23 +76,20 @@ void setup() {
     .pin_href = 14,
     .pin_pclk = 40,
 
-    .xclk_freq_hz = 20000000,
+    .xclk_freq_hz = 16000000,
     .ledc_timer = LEDC_TIMER_0,
     .ledc_channel = LEDC_CHANNEL_0,
 
     .pixel_format = PIXFORMAT_RGB565,
     .frame_size = FRAMESIZE_240X240,
 
-    .jpeg_quality = 12,
+    .jpeg_quality = 64 / 2,
     .fb_count = 2,
     .fb_location = CAMERA_FB_IN_PSRAM,
     .grab_mode = CAMERA_GRAB_LATEST,
 
     .sccb_i2c_port = 0,
   };
-
-  // Release I2C port (when using M5Unified)
-  M5.In_I2C.release();
 
   // Initialize the camera
   esp_err_t err = esp_camera_init(&cam_cfg);
@@ -98,24 +99,23 @@ void setup() {
   }
 
   sensor_t *s = esp_camera_sensor_get();
-  // Flip vertically
-  s->set_vflip(s, 1);
+  // Flip an image for displaying
+  s->set_vflip(s, 1);  // Vertical
+  s->set_hmirror(s, 0); // Horizontal
 
   // Establish WiFi connection
   WiFi.mode(WIFI_STA);
   WiFi.disconnect(false, true);
   WiFi.begin(ssid, pass);
 
-  Serial.println("Connecting");
+  Serial.print("Connecting");
   auto status = WiFi.status();
   while (status != WL_CONNECTED) {
     Serial.print(".");
-    WiFi.disconnect();
     delay(1000);
-    WiFi.reconnect();
     status = WiFi.status();
   }
-  Serial.printf("Connected: SSID=%s\n", ssid);
+  Serial.printf("\nConnected: SSID=%s, ", ssid);
   Serial.print("IP=");
   Serial.println(WiFi.localIP());
 
