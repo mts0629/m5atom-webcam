@@ -81,7 +81,7 @@ void setup() {
         .ledc_channel = LEDC_CHANNEL_0,
 
         .pixel_format = PIXFORMAT_RGB565,
-        .frame_size = FRAMESIZE_240X240,
+        .frame_size = FRAMESIZE_QVGA,
 
         .jpeg_quality = 64 / 2,
         .fb_count = 2,
@@ -100,8 +100,7 @@ void setup() {
 
     sensor_t *s = esp_camera_sensor_get();
     // Flip an image for displaying
-    s->set_vflip(s, 1);    // Vertical
-    s->set_hmirror(s, 0); // Horizontal
+    s->set_vflip(s, 1);   // Vertical flip
 
     // Establish WiFi connection
     WiFi.mode(WIFI_STA);
