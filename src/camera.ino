@@ -32,6 +32,9 @@ void capture(WiFiClient *client) {
     client->println();
     client->write(jpg, jpg_len);
 
+    // Wait finish of data transfer
+    delay(100);
+
     free(jpg);
 
     esp_camera_fb_return(fb);
@@ -99,8 +102,9 @@ void setup() {
     }
 
     sensor_t *s = esp_camera_sensor_get();
-    // Flip an image for displaying
-    s->set_vflip(s, 1);   // Vertical flip
+    // Flip an image for display
+    s->set_vflip(s, 1);
+    s->set_hmirror(s, 0);
 
     // Establish WiFi connection
     WiFi.mode(WIFI_STA);
