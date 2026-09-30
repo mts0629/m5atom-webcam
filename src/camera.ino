@@ -101,12 +101,12 @@ void setup() {
     // Flip an image for display
     s->set_vflip(s, 1);
     s->set_hmirror(s, 0);
-
-    WiFi.mode(WIFI_STA);
-    WiFi.disconnect(false, true);
 }
 
-bool connect_to_ap(const char *ssid, const char *password) {
+void connect_to_ap(const char *ssid, const char *password) {
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect(false, true);
+
     WiFi.begin(ssid, password);
 
     int i = 0;
@@ -122,38 +122,44 @@ bool connect_to_ap(const char *ssid, const char *password) {
 
     if (status != WL_CONNECTED) {
         Serial.printf("\nConnection failed: SSID=%s\n", ssid);
-        return false;
+        return;
     }
 
     Serial.printf("\nConnected: SSID=%s, ", ssid);
     Serial.print("IP=");
     Serial.println(WiFi.localIP());
 
-    return true;
+    server.begin();
 }
 
 void loop() {
     M5.update();
 
-    WiFiClient client = server.accept();
+    if (WiFi.isConnected()) {
+        WiFiClient client = server.accept();
 
-    if (client) {
-        if (client.connected() && client.available()) {
-            capture(&client);
+        if (client) {
+            if (client.connected() && client.available()) {
+                capture(&client);
+            }
+            client.stop();
         }
-        client.stop();
     } else {
         // Input SSID and password from serial console
         Serial.print("SSID: ");
-        auto ssid_str = Serial.readStringUntil('\n');
+        String ssid_str;
+        while (ssid_str.isEmpty()) {
+            ssid_str = Serial.readStringUntil('\n');
+        }
         ssid_str.trim();
         Serial.print("Password: ");
-        auto pass_str = Serial.readStringUntil('\n');
+        String pass_str;
+        while (pass_str.isEmpty()) {
+            pass_str = Serial.readStringUntil('\n');
+        }
         pass_str.trim();
 
         // Establish WiFi connection
-        if (connect_to_ap(ssid_str.c_str(), pass_str.c_str())) {
-            server.begin();
-        }
+        connect_to_ap(ssid_str.c_str(), pass_str.c_str());
     }
 }
