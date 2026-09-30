@@ -3,10 +3,6 @@
 
 #include <esp_camera.h>
 
-// AP info
-const char *ssid = "***";
-const char *pass = "***";
-
 // Server instance
 WiFiServer server(80);
 
@@ -57,8 +53,6 @@ void setup() {
     M5.In_I2C.release();
     M5.In_I2C.begin(I2C_NUM_0, 12, 9);
 
-    Serial.println("Init camera");
-
     // Camera configuration
     camera_config_t cam_cfg = {
         .pin_pwdn = -1,
@@ -101,40 +95,65 @@ void setup() {
         return;
     }
 
+    Serial.println("Init camera");
+
     sensor_t *s = esp_camera_sensor_get();
     // Flip an image for display
     s->set_vflip(s, 1);
     s->set_hmirror(s, 0);
 
-    // Establish WiFi connection
     WiFi.mode(WIFI_STA);
     WiFi.disconnect(false, true);
-    WiFi.begin(ssid, pass);
+}
 
+bool connect_to_ap(const char *ssid, const char *password) {
+    WiFi.begin(ssid, password);
+
+    int i = 0;
+    const int max_try = 60;
     Serial.print("Connecting");
     auto status = WiFi.status();
-    while (status != WL_CONNECTED) {
+    while ((status != WL_CONNECTED) || (i > max_try)) {
         Serial.print(".");
+        i++;
         delay(1000);
         status = WiFi.status();
     }
+
+    if (status != WL_CONNECTED) {
+        Serial.printf("\nConnection failed: SSID=%s\n", ssid);
+        return false;
+    }
+
     Serial.printf("\nConnected: SSID=%s, ", ssid);
     Serial.print("IP=");
     Serial.println(WiFi.localIP());
 
-    // Start the server
-    server.begin();
+    return true;
 }
 
 void loop() {
     M5.update();
 
     WiFiClient client = server.accept();
+
     if (client) {
         if (client.connected() && client.available()) {
             capture(&client);
         }
-
         client.stop();
+    } else {
+        // Input SSID and password from serial console
+        Serial.print("SSID: ");
+        auto ssid_str = Serial.readStringUntil('\n');
+        ssid_str.trim();
+        Serial.print("Password: ");
+        auto pass_str = Serial.readStringUntil('\n');
+        pass_str.trim();
+
+        // Establish WiFi connection
+        if (connect_to_ap(ssid_str.c_str(), pass_str.c_str())) {
+            server.begin();
+        }
     }
 }
