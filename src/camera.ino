@@ -36,6 +36,35 @@ void capture(WiFiClient *client) {
     esp_camera_fb_return(fb);
 }
 
+void connect_to_ap(const char *ssid, const char *password) {
+    WiFi.mode(WIFI_STA);
+    WiFi.disconnect(false, true);
+
+    WiFi.begin(ssid, password);
+
+    int i = 0;
+    const int max_try = 60;
+    Serial.print("Connecting");
+    auto status = WiFi.status();
+    while ((status != WL_CONNECTED) || (i > max_try)) {
+        Serial.print(".");
+        i++;
+        delay(1000);
+        status = WiFi.status();
+    }
+
+    if (status != WL_CONNECTED) {
+        Serial.printf("\nConnection failed: SSID=%s\n", ssid);
+        return;
+    }
+
+    Serial.printf("\nConnected: SSID=%s, ", ssid);
+    Serial.print("IP=");
+    Serial.println(WiFi.localIP());
+
+    server.begin();
+}
+
 void setup() {
     auto cfg = M5.config();
     M5.begin(cfg);
@@ -101,35 +130,9 @@ void setup() {
     // Flip an image for display
     s->set_vflip(s, 1);
     s->set_hmirror(s, 0);
-}
 
-void connect_to_ap(const char *ssid, const char *password) {
-    WiFi.mode(WIFI_STA);
-    WiFi.disconnect(false, true);
-
-    WiFi.begin(ssid, password);
-
-    int i = 0;
-    const int max_try = 60;
-    Serial.print("Connecting");
-    auto status = WiFi.status();
-    while ((status != WL_CONNECTED) || (i > max_try)) {
-        Serial.print(".");
-        i++;
-        delay(1000);
-        status = WiFi.status();
-    }
-
-    if (status != WL_CONNECTED) {
-        Serial.printf("\nConnection failed: SSID=%s\n", ssid);
-        return;
-    }
-
-    Serial.printf("\nConnected: SSID=%s, ", ssid);
-    Serial.print("IP=");
-    Serial.println(WiFi.localIP());
-
-    server.begin();
+    // Connect with the initial SSID and password
+    connect_to_ap(AP_SSID, AP_PASS);
 }
 
 void loop() {
