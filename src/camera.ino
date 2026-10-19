@@ -36,6 +36,7 @@ void capture(WiFiClient *client) {
     esp_camera_fb_return(fb);
 }
 
+// Connect to an AP with specified SSID and password
 void connect_to_ap(const char *ssid, const char *password) {
     WiFi.mode(WIFI_STA);
     WiFi.disconnect(false, true);
@@ -131,8 +132,22 @@ void setup() {
     s->set_vflip(s, 1);
     s->set_hmirror(s, 0);
 
-    // Connect with the initial SSID and password
+    // Connect to an AP with the initial SSID and password
+    // (from config/secret.ini)
     connect_to_ap(AP_SSID, AP_PASS);
+}
+
+// Get trimmed string from a serial input
+String get_str_from_serial(const char *prompt) {
+    Serial.print(prompt);
+
+    String str;
+    while (str.isEmpty()) {
+        str = Serial.readStringUntil('\n');
+    }
+    str.trim();
+
+    return str;
 }
 
 void loop() {
@@ -148,21 +163,10 @@ void loop() {
             client.stop();
         }
     } else {
-        // Input SSID and password from serial console
-        Serial.print("SSID: ");
-        String ssid_str;
-        while (ssid_str.isEmpty()) {
-            ssid_str = Serial.readStringUntil('\n');
-        }
-        ssid_str.trim();
-        Serial.print("Password: ");
-        String pass_str;
-        while (pass_str.isEmpty()) {
-            pass_str = Serial.readStringUntil('\n');
-        }
-        pass_str.trim();
+        // Get SSID and password string
+        auto ssid_str = get_str_from_serial("SSID: ");
+        auto pass_str = get_str_from_serial("Password: ");
 
-        // Establish WiFi connection
         connect_to_ap(ssid_str.c_str(), pass_str.c_str());
     }
 }
