@@ -36,6 +36,9 @@ void capture(WiFiClient *client) {
     esp_camera_fb_return(fb);
 }
 
+// #define STA_MODE
+#define AP_MODE
+
 // Connect to an AP with specified SSID and password
 void connect_to_ap(const char *ssid, const char *password) {
     WiFi.mode(WIFI_STA);
@@ -62,6 +65,20 @@ void connect_to_ap(const char *ssid, const char *password) {
     Serial.printf("\nConnected: SSID=%s, ", ssid);
     Serial.print("IP=");
     Serial.println(WiFi.localIP());
+
+    server.begin();
+}
+
+// Start an AP with specified SSID and password
+void start_ap(const char *ssid, const char *password) {
+    if (!WiFi.softAP(ssid, password)) {
+        Serial.println("[ERROR] soft AP creation failed");
+        return;
+    }
+
+    Serial.printf("\nStarted: SSID=%s, password=%s\n", ssid, password);
+    Serial.print("IP=");
+    Serial.println(WiFi.softAPIP());
 
     server.begin();
 }
@@ -132,9 +149,14 @@ void setup() {
     s->set_vflip(s, 1);
     s->set_hmirror(s, 0);
 
-    // Connect to an AP with the initial SSID and password
-    // (from config/secret.ini)
+    // WiFI setting: use SSID and password defined by config/secret.ini
+#ifdef STA_MODE
     connect_to_ap(AP_SSID, AP_PASS);
+#endif
+
+#ifdef AP_MODE
+    start_ap(AP_SSID, AP_PASS);
+#endif
 }
 
 // Get trimmed string from a serial input
@@ -153,6 +175,7 @@ String get_str_from_serial(const char *prompt) {
 void loop() {
     M5.update();
 
+#ifdef STA_MODE
     if (WiFi.isConnected()) {
         WiFiClient client = server.accept();
 
@@ -163,10 +186,26 @@ void loop() {
             client.stop();
         }
     } else {
+        Serial.println("--- Specify the access point ---");
+
         // Get SSID and password string
         auto ssid_str = get_str_from_serial("SSID: ");
         auto pass_str = get_str_from_serial("Password: ");
 
         connect_to_ap(ssid_str.c_str(), pass_str.c_str());
     }
+#endif
+
+#ifdef AP_MODE
+    WiFiClient client = server.accept();
+
+    if (client) {
+        if (client.connected() && client.available()) {
+            capture(&client);
+        }
+        client.stop();
+    }
+
+    delay(100);
+#endif
 }
