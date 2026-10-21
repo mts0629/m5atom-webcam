@@ -32,8 +32,77 @@ void capture(WiFiClient *client) {
     delay(100);
 
     free(jpg);
+    jpg = NULL;
 
     esp_camera_fb_return(fb);
+    fb = NULL;
+}
+
+#define FRAME_BOUNDARY "__boundary__"
+
+// Capture a stream
+void capture_stream(WiFiClient *client) {
+    client->println("HTTP/1.1 200 OK");
+    // MotionJPEG stream
+    client->printf(
+        "Content-Type: multipart/x-mixed-replace; boundary=%s\r\n",
+        FRAME_BOUNDARY
+    );
+    client->println("Content-Disposition: inline; filename=capture.jpg");
+    client->println("Access-Control-Allow-Origin: *"); // Allow all origins
+    client->println();
+
+    camera_fb_t *fb;
+    uint8_t *jpg = NULL;
+    size_t jpg_len = 0;
+    constexpr size_t PACKET_LEN = 8192;
+    while (client->available()) {
+        // Get a frame
+        fb = esp_camera_fb_get();
+        if (!fb) {
+            Serial.println("[ERROR] capture failed");
+            continue;
+        }
+
+        // Convert to JPEG
+        frame2jpg(fb, 50, &jpg, &jpg_len);
+
+        client->print("--" FRAME_BOUNDARY "\r\n");
+        client->printf(
+            "Content-Type: image/jpeg\r\nContent-Length: %u\r\n\r\n", jpg_len
+        );
+
+        uint8_t *p = jpg;
+        while (true) {
+            // Transfer the frame by packets
+            size_t send_len = (jpg_len > PACKET_LEN) ? PACKET_LEN : jpg_len;
+            size_t sent_len = client->write(p, send_len);
+            if (sent_len == 0) {
+                break;
+            }
+            p += sent_len;
+            jpg_len -= sent_len;
+        }
+
+        if (fb) {
+            esp_camera_fb_return(fb);
+            fb = NULL;
+        }
+
+        if (jpg) {
+            free(jpg);
+            jpg = NULL;
+            jpg_len = 0;
+        }
+    }
+
+    if (fb) {
+        esp_camera_fb_return(fb);
+        fb = NULL;
+    }
+
+    free(jpg);
+    jpg = NULL;
 }
 
 // #define STA_MODE
@@ -200,10 +269,14 @@ void loop() {
     WiFiClient client = server.accept();
 
     if (client) {
+        Serial.println("Connected");
+
         if (client.connected() && client.available()) {
-            capture(&client);
+            capture_stream(&client);
         }
         client.stop();
+
+        Serial.println("Disconnected");
     }
 
     delay(100);
