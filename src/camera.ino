@@ -228,19 +228,6 @@ void setup() {
 #endif
 }
 
-// Get trimmed string from a serial input
-String get_str_from_serial(const char *prompt) {
-    Serial.print(prompt);
-
-    String str;
-    while (str.isEmpty()) {
-        str = Serial.readStringUntil('\n');
-    }
-    str.trim();
-
-    return str;
-}
-
 void loop() {
     M5.update();
 
@@ -254,15 +241,9 @@ void loop() {
             }
             client.stop();
         }
-    } else {
-        Serial.println("--- Specify the access point ---");
-
-        // Get SSID and password string
-        auto ssid_str = get_str_from_serial("SSID: ");
-        auto pass_str = get_str_from_serial("Password: ");
-
-        connect_to_ap(ssid_str.c_str(), pass_str.c_str());
     }
+
+    delay(100);
 #endif
 
 #ifdef AP_MODE
