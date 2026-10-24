@@ -109,17 +109,16 @@ void capture_stream(WiFiClient *client) {
 #define AP_MODE
 
 // Connect to an AP with specified SSID and password
-void connect_to_ap(const char *ssid, const char *password) {
+void connect_to_ap(const char *ssid, const char *password, const int try_sec) {
     WiFi.mode(WIFI_STA);
     WiFi.disconnect(false, true);
 
     WiFi.begin(ssid, password);
 
     int i = 0;
-    const int max_try = 60;
     Serial.print("Connecting");
     auto status = WiFi.status();
-    while ((status != WL_CONNECTED) || (i > max_try)) {
+    while ((status != WL_CONNECTED) || (i > try_sec)) {
         Serial.print(".");
         i++;
         delay(1000);
@@ -220,7 +219,7 @@ void setup() {
 
     // WiFI setting: use SSID and password defined by config/secret.ini
 #ifdef STA_MODE
-    connect_to_ap(AP_SSID, AP_PASS);
+    connect_to_ap(AP_SSID, AP_PASS, 60);
 #endif
 
 #ifdef AP_MODE
@@ -232,34 +231,27 @@ void loop() {
     M5.update();
 
 #ifdef STA_MODE
-    if (WiFi.isConnected()) {
-        WiFiClient client = server.accept();
-
-        if (client) {
-            if (client.connected() && client.available()) {
-                capture(&client);
-            }
-            client.stop();
-        }
+    if (!WiFi.isConnected()) {
+        continue;
     }
-
-    delay(100);
 #endif
-
-#ifdef AP_MODE
     WiFiClient client = server.accept();
 
     if (client) {
+#ifdef AP_MODE
         Serial.println("Connected");
+#endif
 
         if (client.connected() && client.available()) {
+            // capture(&client);
             capture_stream(&client);
         }
         client.stop();
 
+#ifdef AP_MODE
         Serial.println("Disconnected");
+#endif
     }
 
     delay(100);
-#endif
 }
