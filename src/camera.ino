@@ -109,7 +109,7 @@ void capture_stream(WiFiClient *client) {
 #define AP_MODE
 
 // Connect to an AP with specified SSID and password
-void connect_to_ap(const char *ssid, const char *password, const int try_sec) {
+bool connect_to_ap(const char *ssid, const char *password, const int try_sec) {
     WiFi.mode(WIFI_STA);
     WiFi.disconnect(false, true);
 
@@ -127,28 +127,31 @@ void connect_to_ap(const char *ssid, const char *password, const int try_sec) {
 
     if (status != WL_CONNECTED) {
         Serial.printf("\nConnection failed: SSID=%s\n", ssid);
-        return;
+        return false;
     }
 
     Serial.printf("\nConnected: SSID=%s, ", ssid);
     Serial.print("IP=");
     Serial.println(WiFi.localIP());
 
-    server.begin();
+    return true;
 }
 
 // Start an AP with specified SSID and password
-void start_ap(const char *ssid, const char *password) {
+bool start_ap(const char *ssid, const char *password) {
+    WiFi.mode(WIFI_AP);
+    WiFi.disconnect(false, true);
+
     if (!WiFi.softAP(ssid, password)) {
         Serial.println("[ERROR] soft AP creation failed");
-        return;
+        return false;
     }
 
     Serial.printf("\nStarted: SSID=%s, password=%s\n", ssid, password);
     Serial.print("IP=");
     Serial.println(WiFi.softAPIP());
 
-    server.begin();
+    return true;
 }
 
 void setup() {
@@ -218,29 +221,28 @@ void setup() {
     s->set_hmirror(s, 0);
 
     // WiFI setting: use SSID and password defined by config/secret.ini
+    bool connected;
 #ifdef STA_MODE
-    connect_to_ap(AP_SSID, AP_PASS, 60);
+    connected = connect_to_ap(AP_SSID, AP_PASS, 30);
 #endif
-
 #ifdef AP_MODE
-    start_ap(AP_SSID, AP_PASS);
+    connected = start_ap(AP_SSID, AP_PASS);
 #endif
+    if (!connected) {
+        M5.Power.deepSleep();
+    }
+
+    server.begin();
 }
 
 void loop() {
     M5.update();
 
-#ifdef STA_MODE
-    if (!WiFi.isConnected()) {
-        continue;
-    }
-#endif
     WiFiClient client = server.accept();
 
     if (client) {
-#ifdef AP_MODE
-        Serial.println("Connected");
-#endif
+        Serial.print("Connected from: ");
+        Serial.println(client.remoteIP());
 
         if (client.connected() && client.available()) {
             // capture(&client);
@@ -248,9 +250,7 @@ void loop() {
         }
         client.stop();
 
-#ifdef AP_MODE
         Serial.println("Disconnected");
-#endif
     }
 
     delay(100);
